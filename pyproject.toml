@@ -1,0 +1,24 @@
+[project]
+name = "prcf"
+version = "0.1.0"
+description = "Perception-reliability- and contact-feasibility-aware humanoid whole-body control"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "mjlab==1.6.0",
+]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["prcf*"]
+
+[tool.setuptools.package-data]
+"prcf.asset.robot.e1" = ["xmls/*.xml", "xmls/meshes/*.STL", "xmls/meshes/*.stl"]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true

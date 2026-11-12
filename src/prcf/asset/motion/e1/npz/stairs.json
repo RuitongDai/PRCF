@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "clip_id": "stairs",
+  "robot_id": "e1_25dof",
+  "motion_file": "stairs.npz",
+  "fps": 50.0,
+  "coordinates": {
+    "length_unit": "m",
+    "up_axis": "z",
+    "quaternion_order": "wxyz"
+  },
+  "motion_to_scene": {
+    "position": [
+      0,
+      0,
+      -0.015
+    ],
+    "quaternion_wxyz": [
+      1,
+      0,
+      0,
+      0
+    ]
+  },
+  "scene": {
+    "ground_height": 0,
+    "ground_friction": [
+      0.8,
+      0.005,
+      0.0001
+    ],
+    "obstacles": [
+      {
+        "id": "stairs_base",
+        "type": "box",
+        "size_xyz": [
+          1.57,
+          1.2,
+          0.12
+        ],
+        "position": [
+          -0.485,
+          0.25,
+          0.06
+        ],
+        "quaternion_wxyz": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "fixed": true
+      },
+      {
+        "id": "stairs_middle",
+        "type": "box",
+        "size_xyz": [
+          0.96,
+          1.2,
+          0.27
+        ],
+        "position": [
+          -0.56,
+          0.25,
+          0.135
+        ],
+        "quaternion_wxyz": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "fixed": true
+      },
+      {
+        "id": "stairs_top",
+        "type": "box",
+        "size_xyz": [
+          0.4,
+          1.2,
+          0.375
+        ],
+        "position": [
+          -0.55,
+          0.25,
+          0.1875
+        ],
+        "quaternion_wxyz": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "fixed": true
+      }
+    ]
+  },
+  "metadata": {
+    "scene_status": "estimated_from_retargeted_kinematics",
+    "source_motion_sha256": "6c528dae2e47ac765fe13f0fce170b4ee810581c71db509e176c7c14e2c2052a",
+    "fit_basis": "E1 collision foot soles and hand capsules, stance plateaus, and trajectory extents. Geometry is estimated; not recovered ground truth.",
+    "requires_visual_review": true,
+    "physics_tracking_validated": false,
+    "unobserved_dimensions": "Obstacle width and far boundaries are clearance assumptions, not identifiable from this motion.",
+    "vertical_alignment_m": -0.015,
+    "kinematic_scene_check": {
+      "max_environment_penetration_m": 0.03587136792213596,
+      "frames_over_0_015m": 51,
+      "frames": 568,
+      "worst_contacts": [
+        {
+          "distance_m": -0.03587,
+          "frame": 459,
+          "geoms": [
+            "robot/left_foot1_collision",
+            "prcf_stairs_base"
+          ]
+        },
+        {
+          "distance_m": -0.03581,
+          "frame": 459,
+          "geoms": [
+            "robot/left_foot2_collision",
+            "prcf_stairs_base"
+          ]
+        },
+        {
+          "distance_m": -0.03575,
+          "frame": 459,
+          "geoms": [
+            "robot/left_foot3_collision",
+            "prcf_stairs_base"
+          ]
+        },
+        {
+          "distance_m": -0.03568,
+          "frame": 459,
+          "geoms": [
+            "robot/left_foot4_collision",
+            "prcf_stairs_base"
+          ]
+        },
+        {
+          "distance_m": -0.03562,
+          "frame": 459,
+          "geoms": [
+            "robot/left_foot5_collision",
+            "prcf_stairs_base"
+          ]
+        },
+        {
+          "distance_m": -0.03556,
+          "frame": 459,
+          "geoms": [
+            "robot/left_foot6_collision",
+            "prcf_stairs_base"
+          ]
+        },
+        {
+          "distance_m": -0.0355,
+          "frame": 459,
+          "geoms": [
+            "robot/left_foot7_collision",
+            "prcf_stairs_base"
+          ]
+        },
+        {
+          "distance_m": -0.03326,
+          "frame": 458,
+          "geoms": [
+            "robot/left_foot1_collision",
+            "prcf_stairs_base"
+          ]
+        }
+      ]
+    }
+  }
+}

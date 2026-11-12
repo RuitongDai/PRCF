@@ -1,0 +1,58 @@
+<mujoco>
+<worldbody>
+
+  <!-- 15cm -->
+  <body name="stairs_15cm" pos="0 0 0">
+    <geom pos="2.15 0 0.075" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="2.45 0 0.225" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="2.75 0 0.375" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="3.05 0 0.525" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="3.35 0 0.675" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="3.65 0 0.825" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="3.95 0 0.975" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="4.25 0 1.125" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="4.55 0 1.275" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="4.85 0 1.425" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+
+    <geom pos="5.6 0 1.425" type="box" size="0.6 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+
+    <geom pos="6.35 0 1.425" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="6.65 0 1.275" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="6.95 0 1.125" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="7.25 0 0.975" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="7.55 0 0.825" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="7.85 0 0.675" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="8.15 0 0.525" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="8.45 0 0.375" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="8.75 0 0.225" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+    <geom pos="9.05 0 0.075" type="box" size="0.15 2 0.075" rgba="0.4 0.3 0.2 1" quat="1 0 0 0"/>
+  </body>
+
+  <body name="box30-1" pos="-3  0 0">
+    <geom pos="0 0 0" type="box" size="0.5 2 0.3" rgba="0.4 0.3 0.2 1"/>
+    <geom pos="1.5 0 0" type="box" size="0.5 2 0.3" rgba="0.4 0.3 0.2 1"/>
+    <!-- <geom pos="2.5 0 0" type="box" size="0.5 2 0.3" rgba="0.4 0.3 0.2 1"/>
+    <geom pos="3.9 0 0" type="box" size="0.5 2 0.3" rgba="0.4 0.3 0.2 1"/>
+    <geom pos="5.4 0 0" type="box" size="0.5 2 0.3" rgba="0.4 0.3 0.2 1"/> -->
+  </body>
+
+
+  <body name="box30-2" pos="11  0 0">
+    <geom pos="0 0 0" type="box" size="0.5 2 0.3" rgba="0.4 0.3 0.2 1"/>
+    <geom pos="1.5 0 0" type="box" size="0.5 2 0.3" rgba="0.4 0.3 0.2 1"/>
+    <!-- <geom pos="2.5 0 0" type="box" size="0.5 2 0.3" rgba="0.4 0.3 0.2 1"/>
+    <geom pos="3.9 0 0" type="box" size="0.5 2 0.3" rgba="0.4 0.3 0.2 1"/>
+    <geom pos="5.4 0 0" type="box" size="0.5 2 0.3" rgba="0.4 0.3 0.2 1"/> -->
+  </body>
+
+  <!-- <body name="box40" pos="-2  6  0">
+    <geom pos="0 0 0" type="box" size="0.5 1 0.4" rgba="0.4 0.3 0.2 1"/>
+    <geom pos="-1.2 0 0" type="box" size="0.5 1 0.4" rgba="0.4 0.3 0.2 1"/>
+    <geom pos="-2.5 0 0" type="box" size="0.5 1 0.4" rgba="0.4 0.3 0.2 1"/>
+    <geom pos="-3.9 0 0" type="box" size="0.5 1 0.4" rgba="0.4 0.3 0.2 1"/>
+    <geom pos="-5.4 0 0" type="box" size="0.5 1 0.4" rgba="0.4 0.3 0.2 1"/>
+  </body> -->
+
+    
+</worldbody>
+</mujoco>

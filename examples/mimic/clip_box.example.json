@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "clip_id": "e1_climb_001",
+  "robot_id": "e1_25dof",
+  "motion_file": "motion.npz",
+  "fps": 50,
+  "coordinates": {"length_unit": "m", "up_axis": "z", "quaternion_order": "wxyz"},
+  "motion_to_scene": {"position": [0, 0, 0], "quaternion_wxyz": [1, 0, 0, 0]},
+  "scene": {
+    "ground_height": 0,
+    "ground_friction": [0.8, 0.005, 0.0001],
+    "obstacles": [
+      {"id": "box_0", "type": "box", "size_xyz": [1.2, 1.0, 0.6],
+       "position": [1.2, 0, 0.3], "quaternion_wxyz": [1, 0, 0, 0], "fixed": true}
+    ]
+  },
+  "quality": {
+    "max_root_error": 0.25,
+    "max_body_error": 0.25,
+    "max_joint_rmse": 0.35,
+    "final_root_error": 0.15,
+    "contact_requirements": []
+  },
+  "metadata": {"note": "Template only: replace geometry, fps, and contact intervals to match the actual motion."}
+}

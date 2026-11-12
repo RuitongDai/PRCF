@@ -1,0 +1,21 @@
+.venv/
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Motion files, trained models, and generated experiment artifacts.
+/data/
+# Legacy compatibility symlink/directory.
+/outputs
+/wandb/
+/datasets/**/*.npz
+/datasets/**/*.mp4
+/datasets/**/rollouts/
+/datasets/**/references/
+# Training, evaluation, exported references, and TensorBoard logs.
+/logs/

@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "clip_id": "down_box",
+  "robot_id": "e1_25dof",
+  "motion_file": "down_box.npz",
+  "fps": 50.0,
+  "coordinates": {
+    "length_unit": "m",
+    "up_axis": "z",
+    "quaternion_order": "wxyz"
+  },
+  "motion_to_scene": {
+    "position": [
+      0,
+      0,
+      0.008
+    ],
+    "quaternion_wxyz": [
+      1,
+      0,
+      0,
+      0
+    ]
+  },
+  "scene": {
+    "ground_height": 0,
+    "ground_friction": [
+      0.8,
+      0.005,
+      0.0001
+    ],
+    "obstacles": [
+      {
+        "id": "descent_box",
+        "type": "box",
+        "size_xyz": [
+          1.225,
+          1.2,
+          0.905
+        ],
+        "position": [
+          -0.2875,
+          -0.05,
+          0.4525
+        ],
+        "quaternion_wxyz": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "fixed": true
+      }
+    ]
+  },
+  "metadata": {
+    "scene_status": "estimated_from_retargeted_kinematics",
+    "source_motion_sha256": "4c412284246dae5df997a85a46d7aa6fa8901b1cecdfe5aafd4d23cd64648b7d",
+    "fit_basis": "E1 collision foot soles and hand capsules, stance plateaus, and trajectory extents. Geometry is estimated; not recovered ground truth.",
+    "requires_visual_review": true,
+    "physics_tracking_validated": false,
+    "unobserved_dimensions": "Obstacle width and far boundaries are clearance assumptions, not identifiable from this motion.",
+    "vertical_alignment_m": 0.008,
+    "kinematic_scene_check": {
+      "max_environment_penetration_m": 0.03162486003617393,
+      "frames_over_0_015m": 19,
+      "frames": 405,
+      "worst_contacts": [
+        {
+          "distance_m": -0.03162,
+          "frame": 268,
+          "geoms": [
+            "prcf_ground",
+            "robot/right_foot7_collision"
+          ]
+        },
+        {
+          "distance_m": -0.03083,
+          "frame": 267,
+          "geoms": [
+            "prcf_ground",
+            "robot/right_foot7_collision"
+          ]
+        },
+        {
+          "distance_m": -0.03012,
+          "frame": 269,
+          "geoms": [
+            "prcf_ground",
+            "robot/right_foot7_collision"
+          ]
+        },
+        {
+          "distance_m": -0.02895,
+          "frame": 266,
+          "geoms": [
+            "prcf_ground",
+            "robot/right_foot7_collision"
+          ]
+        },
+        {
+          "distance_m": -0.02881,
+          "frame": 268,
+          "geoms": [
+            "prcf_ground",
+            "robot/right_foot6_collision"
+          ]
+        },
+        {
+          "distance_m": -0.02879,
+          "frame": 291,
+          "geoms": [
+            "prcf_ground",
+            "robot/right_foot1_collision"
+          ]
+        },
+        {
+          "distance_m": -0.02847,
+          "frame": 267,
+          "geoms": [
+            "prcf_ground",
+            "robot/right_foot6_collision"
+          ]
+        },
+        {
+          "distance_m": -0.02787,
+          "frame": 292,
+          "geoms": [
+            "prcf_ground",
+            "robot/right_foot1_collision"
+          ]
+        }
+      ]
+    }
+  }
+}
