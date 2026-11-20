@@ -4,10 +4,12 @@
 
 面向复杂地形的人形机器人感知可靠性与接触可行性驱动的全身运动控制研究。
 
-当前已完成 E1 25 自由度机器人的数据处理流程：重定向 CSV 转换、动作与场景配对、Mimic 跟踪训练、策略回放，以及物理参考轨迹的验收与导出。后续 Parkour / AMP 任务使用这些物理参考数据。
+当前已完成 E1 25 自由度机器人的数据处理流程：重定向 CSV 转换、动作与场景配对、Mimic 跟踪训练、策略回放，以及 AMP 参考特征导出。
+
+TIMP 越障基线已接入训练和回放，支持地形索引 AMP 和手膝几何支撑适应。见 [TIMP 训练说明](src/prcf/tasks/parkour/config/TIMP/README.md)。
 
 ```text
-重定向 CSV → mjlab NPZ → 配套场景 JSON → Mimic 训练 → 评估 → 导出物理参考
+重定向 CSV → mjlab NPZ → 配套场景 JSON → Mimic 训练 → 策略执行 → 导出 AMP NPZ
 ```
 
 以下命令均在项目根目录执行。多行命令中的反斜杠 `\` 后不要添加空格。
@@ -80,14 +82,14 @@ uv run python scripts/csv_to_npz_e1.py \
 
 ### 选择动作与障碍物
 
-| 动作 | 训练、play、评估和导出时使用的输入 |
+| 动作 | 训练、play 和导出时使用的输入 |
 |---|---|
 | 平地 | `src/prcf/asset/motion/e1/npz/017.npz` |
 | 台阶 | `src/prcf/asset/motion/e1/npz/stairs.json` |
 | 上箱 | `src/prcf/asset/motion/e1/npz/up_box.json` |
 | 下箱 | `src/prcf/asset/motion/e1/npz/down_box.json` |
 
-JSON 通过 `motion_file` 关联 NPZ，保存障碍物尺寸、位置、摩擦、轨迹坐标对齐和验收阈值。箱体 `size_xyz` 使用完整长宽高，`position` 使用中心位置，单位均为米。
+JSON 通过 `motion_file` 关联 NPZ，保存障碍物尺寸、位置、摩擦和轨迹坐标对齐。箱体 `size_xyz` 使用完整长宽高，`position` 使用中心位置，单位均为米。
 
 **障碍动作应传 JSON。** 训练和策略 play 直接读取 NPZ 时使用默认平地，不会自动加载旁边的 JSON。
 
@@ -126,7 +128,7 @@ uv run python scripts/replay_motion.py --motion-file src/prcf/asset/motion/e1/np
 | `PRCF-Mimic-E1-25DoF-Reference` | 当前使用：参考关节姿态加动作残差，并加入双脚世界位置跟踪奖励 |
 | `PRCF-Mimic-E1-25DoF` | 保留的基线：相对固定站姿输出关节目标 |
 
-两者都使用普通 PPO 和 `MjlabOnPolicyRunner`。**训练、play、评估和导出须使用与 checkpoint 一致的任务 ID。**
+两者都使用普通 PPO 和 `MjlabOnPolicyRunner`。**训练、play 和导出须使用与 checkpoint 一致的任务 ID。**
 
 下面统一使用参考残差任务，以台阶动作为例；在同一终端设置后续命令使用的变量：
 
@@ -137,14 +139,13 @@ PRCF_MOTION="src/prcf/asset/motion/e1/npz/stairs.json"
 
 切换平地、上箱或下箱动作时，修改 `PRCF_MOTION` 即可。当前每次运行跟踪一条动作，所有并行 env 共同训练一个策略。
 
-### 校验与预检
+### 场景预检
 
 ```bash
-uv run python scripts/validate_motion.py --motion-file "$PRCF_MOTION"
 uv run python scripts/train.py "$PRCF_TASK" --motion-file "$PRCF_MOTION" --num-envs 1 --dry-run
 ```
 
-预检会校验动作并编译场景，不启动 PPO，也不需要 CUDA。
+预检会加载动作并在 CPU 上编译场景。
 
 ### 开始训练
 
@@ -166,7 +167,7 @@ uv run tensorboard --logdir logs --port 6006
 
 ### 选择 checkpoint 与继续训练
 
-将下面的 `RUN_ID` 替换为实际运行目录，checkpoint 文件名替换为要使用的版本。后续 play、评估和导出共用此变量：
+将下面的 `RUN_ID` 替换为实际运行目录，checkpoint 文件名替换为要使用的版本。后续 play 和导出共用此变量：
 
 ```bash
 PRCF_CHECKPOINT="logs/$PRCF_TASK/RUN_ID/model_1500.pt"
@@ -209,53 +210,32 @@ uv run python scripts/play.py "$PRCF_TASK" \
 
 `play.py` 执行训练后的策略，从参考起点开始。它使用临时目录准备输入，退出后清理，**不会新增训练日志目录**。障碍物编辑使用第 3 节的 `replay_motion.py`；保存后的场景供下次启动训练或 play 时加载。
 
-## 6. 完整评估与物理轨迹导出
-
-### 仅评估
-
-```bash
-uv run python scripts/evaluate.py "$PRCF_TASK" \
-  --motion-file "$PRCF_MOTION" \
-  --checkpoint "$PRCF_CHECKPOINT" \
-  --device cuda:0 \
-  --attempts 1
-```
-
-保存 `evaluation.json`，报告完整性、跟踪误差、关节限位、穿透、滑移及已声明的接触要求，不保存 rollout 数组。
-
-### 导出轨迹
+## 6. 导出 AMP 轨迹
 
 ```bash
 uv run python scripts/export_reference.py "$PRCF_TASK" \
   --motion-file "$PRCF_MOTION" \
   --checkpoint "$PRCF_CHECKPOINT" \
   --device cuda:0 \
-  --attempts 1
+  --output-file logs/exports/stairs.npz
 ```
 
-评估和导出各自创建新的 `logs/<任务ID>/<时间戳>/`，与训练 run 分开。导出保留连续物理执行记录，失败时不自动重置后拼接轨迹。
+每次执行从参考第 0 帧开始，采集策略实际运动并写出一个 NPZ。默认路径为
+`logs/exports/<任务ID>/<时间戳>/amp_obs.npz`。使用 `--output-file` 可以直接指定
+文件名。如果目标已存在，换一个文件名。
 
-```text
-logs/<任务ID>/<导出运行目录>/
-├── config/
-├── evaluation.json
-├── references/attempt_0000/     # 通过验收的尝试
-│   ├── motion.npz              # 实际执行的关节、全身位置/姿态及速度
-│   ├── extras.npz              # 动作、实际力矩、手/膝/足接触等附加信息
-│   ├── clip.json               # 场景、来源、坐标约定和验收配置
-│   └── quality.json            # 该尝试的验收结果
-└── rejected/attempt_0000/       # 未通过验收的尝试，使用 rollout.npz
-```
+NPZ 包含八个具名字段和拼接好的 `amp_obs` 矩阵。放进判别器前，可按同一轨迹的连续帧
+切成窗口。文件同时记录 `termination` 和 `expected_frames`，便于区分完整与提前结束的
+动作。导出直接保留已执行的帧。定义见 [AMP 数据格式](docs/motion_format.md#amp-判别器数据)。
 
-每次尝试进入 `references/` 或 `rejected/` 中对应的一处。全部尝试失败时命令返回状态码 `2`，诊断文件仍会保留；默认多次尝试是确定性名义条件下的重复运行。
-
-后续参考池使用通过验收的 `references/attempt_XXXX/` 整个目录，以保留轨迹与场景的对应关系。导出后可检查：
+同一个 NPZ 还保存了回放所需的 pelvis 世界位姿和场景。可直接打开文件或浏览目录。
 
 ```bash
-uv run python scripts/validate_motion.py --motion-file logs/$PRCF_TASK/EXPORT_RUN_ID/references/attempt_0000/clip.json
+uv run python scripts/replay_motion.py --motion-file logs/exports/amp/stairs.npz
+uv run python scripts/replay_motion.py --motion-file logs/exports/amp
 ```
 
-将 `EXPORT_RUN_ID` 替换为实际导出目录。
+训练加载 `np.load(path, allow_pickle=False)['amp_obs']`，每帧 357 维。
 
 ## 7. 日志与配置文件
 
@@ -264,7 +244,7 @@ logs/<任务ID>/<训练运行目录>/
 ├── config/
 │   ├── env.json                # 生效的环境配置快照
 │   ├── rl.json                 # 网络与 PPO 参数
-│   ├── source.json             # 动作、场景、校验结果、哈希和依赖版本
+│   ├── source.json             # 动作、场景、帧数、种子与 checkpoint 来源
 │   └── reference.npz           # 应用坐标对齐后的输入参考副本
 ├── events.out.tfevents.*       # TensorBoard 曲线
 ├── model_0.pt
@@ -272,7 +252,7 @@ logs/<任务ID>/<训练运行目录>/
 └── ...
 ```
 
-`config/reference.npz` 是训练输入；物理执行后通过验收的结果位于导出 run 的 `references/`。checkpoint 默认每 500 轮保存一次，正常结束还会保存最后一轮。
+`config/reference.npz` 保存对齐后的训练输入。导出目录里的 `amp_obs.npz` 保存实际执行的 AMP 特征。checkpoint 默认每 500 轮保存一次，正常结束还会保存最后一轮。
 
 `logs/` 已加入 `.gitignore`。旧 `outputs → logs` 链接仅用于兼容旧路径，实际结果保存在 `logs/`。
 
@@ -283,10 +263,12 @@ logs/<任务ID>/<训练运行目录>/
 | `src/prcf/asset/robot/e1/` | E1 MJCF 与执行器配置 |
 | `src/prcf/tasks/mimic/config/e1/` | 基线环境、PPO 配置与 MDP |
 | `src/prcf/tasks/mimic/config/e1_reference/` | 参考残差动作与脚部跟踪奖励 |
-| `src/prcf/tasks/mimic/workflow.py` | 数据准备、runner 创建、评估与导出流程 |
-| `src/prcf/tasks/mimic/replay.py` | 网页动作与场景编辑器 |
-| `src/prcf/motion/` | 通用数据格式、场景构建、校验、记录与导出 |
-| `scripts/` | 训练、回放、评估和数据处理入口 |
+| `src/prcf/asset/scene.py` | 共用的场景构建、动作读取和对齐 |
+| `scripts/train.py` | 训练、环境准备与 runner 创建 |
+| `scripts/play.py` | 策略回放 |
+| `scripts/replay_motion.py` | 参考动作回放、网页场景编辑 |
+| `scripts/export_reference.py` | 策略执行、轨迹采集、AMP 特征生成和保存 |
+| `scripts/csv_to_npz_e1.py` | E1 CSV 转换 |
 
 - [数据处理流程与实现说明](docs/preprocessing.md)
 - [NPZ 与附加数据字段](docs/motion_format.md)

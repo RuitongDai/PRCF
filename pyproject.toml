@@ -17,6 +17,7 @@ include = ["prcf*"]
 
 [tool.setuptools.package-data]
 "prcf.asset.robot.e1" = ["xmls/*.xml", "xmls/meshes/*.STL", "xmls/meshes/*.stl"]
+"prcf.tasks.parkour.config.TIMP" = ["reference_pools.json"]
 
 [[tool.uv.index]]
 name = "pypi"

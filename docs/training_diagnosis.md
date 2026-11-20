@@ -1,5 +1,7 @@
 # E1 上箱 Mimic 训练诊断（2026-11-11）
 
+本文记录当时的训练诊断和验收设置。当前导出流程见 [预处理说明](preprocessing.md)。
+
 检查对象为 `logs/PRCF-Mimic-E1-25DoF/20261111_173125_843595`，
 4096 环境、50 Hz、468 帧上箱参考。读取日志截至 iteration 4786，并加载
 `model_4500.pt` 在 CPU 上从第 0 帧做确定性 rollout。原训练、checkpoint、

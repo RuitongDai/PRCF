@@ -273,6 +273,14 @@ for actuator in E1_ARTICULATION.actuators:
     E1_ACTION_SCALE[name] = 0.25 * actuator.effort_limit / actuator.stiffness
 
 
+def e1_model():
+    """Compile the configured E1 asset with its joint and body ordering."""
+    from mjlab.entity import Entity
+
+    robot = Entity(get_e1_robot_cfg())
+    return robot.spec.compile(), robot.joint_names, robot.body_names
+
+
 if __name__ == "__main__":
   import mujoco.viewer as viewer
 

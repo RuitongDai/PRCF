@@ -1,56 +1,54 @@
-# Mimic 数据与时间约定
+# Mimic 与 AMP 数据格式
 
-## 输入与输出
+## Mimic 输入
 
-输入为当前 E1 25 自由度模型对应的 mjlab NPZ，或引用该 NPZ 的 `clip.json`。
-JSON 版本为 1，示例见 `examples/mimic/`。字段未知、机器人不符、非米制/
-Z-up/wxyz、静态场景类型不支持等情况直接报错，避免静默忽略配置。
+`--motion-file` 接受 E1 25 自由度轨迹 NPZ 和引用该 NPZ 的场景 JSON。NPZ 使用默认
+平地。场景 JSON 的 `motion_file` 相对 JSON 目录解析。场景描述、障碍物和轨迹对齐
+分别放在 `scene` 与 `motion_to_scene`。示例见 [examples/mimic](../examples/mimic/)。
 
-| NPZ 字段 | 形状 | 含义 |
+| Mimic 输入字段 | 形状 | 含义 |
 |---|---|---|
-| `fps` | `(1,)` | 控制采样频率 Hz |
-| `joint_pos` | `(N,25)` | 关节角 rad，E1 XML 顺序 |
-| `joint_vel` | `(N,25)` | 关节角速度 rad/s |
-| `body_pos_w` | `(N,B,3)` | 全部机器人身体原点位置，m |
-| `body_quat_w` | `(N,B,4)` | 身体原点姿态，wxyz 单位四元数 |
-| `body_lin_vel_w` | `(N,B,3)` | 身体原点线速度，世界坐标，m/s |
-| `body_ang_vel_w` | `(N,B,3)` | 世界坐标角速度，rad/s |
-| `joint_names` | `(25,)` | 推荐提供的字符串名称，导出必带 |
-| `body_names` | `(B,)` | 推荐提供的字符串名称，导出必带 |
+| `fps` | `(1,)` | 控制采样频率，Hz |
+| `joint_pos` / `joint_vel` | `(N, 25)` | E1 XML 顺序的关节角与速度，rad / rad/s |
+| `body_pos_w` | `(N, B, 3)` | 身体原点世界位置，m |
+| `body_quat_w` | `(N, B, 4)` | 身体世界姿态，wxyz |
+| `body_lin_vel_w` / `body_ang_vel_w` | `(N, B, 3)` | 身体原点世界线速度与角速度，m/s / rad/s |
+| `joint_names` / `body_names` | `(25,)` / `(B,)` | 转换器写出的关节和身体名称 |
 
-`B` 由当前模型决定，排除 world，包括固定头部等所有机器人身体；不包含
-障碍物。第一项为 pelvis。不是只导出 tracking 选中的 14 个关键身体。
-姿态/速度采用 link 原点定义，不能混成质心速度。旧输入没有名称时，通过
-抽样 FK 检查提高兼容性检查力度，但仍建议保留源模型与名称映射。
+`B` 由 E1 模型决定，排除 world，第一项为 pelvis。`motion_to_scene` 一致变换世界
+位置、姿态和速度，保留关节角及关节速度。
 
-`motion_to_scene` 对全部身体的位置、姿态和世界系速度应用一致刚体变换。
-关节角不变。导出参考已位于场景坐标，不再重复应用源变换；源变换保留在
-`metadata` 中作为来源记录。世界坐标记录去掉并行环境原点。
+## AMP 判别器数据
 
-## 扩展记录
+`scripts/export_reference.py` 默认每次 rollout 输出一个 NPZ。文件包含八个具名
+数组和拼接后的 `float32` 矩阵 `amp_obs`。`feature_names` 与 `feature_offsets`
+记录列顺序和列边界。
 
-有 N 个状态样本，间隔为 `1/fps`，对应 N-1 个控制区间。`extras.npz` 包含：
+| 字段 | 每帧维度 | 定义 |
+|---|---:|---|
+| `dof_pos` | 25 | E1 关节角 |
+| `body_pos_local` | 13 × 3 | 跟踪身体原点相对 pelvis 的位置，仅消除 yaw |
+| `root_lin_vel` | 3 | pelvis 原点线速度，转到 yaw 对齐坐标 |
+| `root_ang_vel` | 3 | pelvis 角速度，转到 yaw 对齐坐标 |
+| `dof_vel` | 25 | 关节角速度 |
+| `contact_state` | 6 | 左右足、手、膝的接触标志，且最强环境接触力模长至少 5 N |
+| `dof_torque` | 25 | 前一控制区间内执行器关节力矩的物理子步均值 |
+| `height_scan` | 231 | 当前 pelvis 高度减去射线命中面高度 |
 
-- `time`、`reference_frame`：状态采样时间和参考帧。
-- `action`、`joint_position_target`：作用于前一区间的动作/目标；首帧的
-  `action_valid=False`，不可用作已执行动作。
-- `qfrc_actuator_snapshot`：状态刷新后的关节驱动力快照，可能已重新计算。
-- `qfrc_actuator_substep`：`(N-1,D,25)`，实际物理步计算的执行器关节驱动力；
-  D 为 decimation，当前为 4。与 `physics_substep_time` 一一对应。不能用
-  快照替代历史施加的力矩。此字段不包含所有被动/约束广义力。
-- `contact_parts`：左右足、左右手、左右膝的固定通道顺序。
-- `contact_found`、`strongest_contact_force_w`、`contact_position_w`、
-  `contact_normal_w`、`contact_point_velocity_w`：控制频率下的环境接触。
-- 对应接触字段的 `*_substep`：`(N-1,D,...)`，物理子步记录。
-- `min_environment_distance`、`min_self_distance` 及其子步版本：最近接触
-  距离；没有匹配接触时记为零，用于检查负距离（穿透）。
+每帧 357 维。初始化帧缺少实际施加的力矩，因此从原始第 1 帧开始记录，完整执行
+`N` 帧参考时输出 `N-1` 行。`reference_frame` 和 `time` 记录对应帧和时间。
+`termination` 记录结束原因，`expected_frames` 是完整执行预期的输出行数。
+提前结束时保存实际执行的行。
 
-接触只统计指定身体与 world 静态场景之间的接触，自碰撞单独检查。每部位
-选择最强的一处接触，力在世界系，**不是整个足底或手掌的合力**。接触点是
-模拟器返回的几何接触位置，不是关节中心，也不保证等于掌心 site。
-子步的力和接触对应求解该物理步的状态；状态样本在步后 forward/sense 刷新
-后采集，时间区间和状态轴分别保存。
+扫描使用 `scene_json` 所描述的静态碰撞几何。网格随 pelvis 平移并按 yaw 旋转，X
+范围 `[-0.5, 1.5]` 米、Y 范围 `[-0.5, 0.5]` 米、间距 0.1 米，Y 索引变化更快。
+射线从 pelvis 上方 2 米向下发射，最大范围 5 米。无命中编码为 5 米，同时通过
+`height_hit` 标记。在线策略样本需要沿用相同列顺序、坐标、采样间隔、接触定义和
+射线设置。训练时按单条轨迹的连续帧切窗。
 
-训练奖励、参考姿态、运动学碰撞结果均不直接充当“有效支撑”真值。当前
-验收中的支撑使用真实接触和力阈值，具体阈值及区间写入质量报告。后续
-接触预测训练可从这些实际接触记录生成未来接触标签。
+## 回放导出轨迹
+
+同一个 AMP NPZ 还包含 `root_pos_w`（`N×3`，米）和 `root_quat_w`（`N×4`，
+`wxyz`）。这两项记录 pelvis 在场景坐标系中的实际位置和姿态，与 `dof_pos`
+及 `amp_obs` 逐行对齐。回放脚本依据 `scene_json` 恢复障碍物，并用根部位姿和
+关节角重建每帧姿态。训练端继续读取 `amp_obs`，列顺序和维度见上表。

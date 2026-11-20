@@ -2,102 +2,46 @@
 
 本文参考 `/home/dai/E1/E1_parkour_mjlab` 的任务组织方式：每个实验变体集中
 管理环境配置、算法配置、MDP 和 RL 扩展，通过任务 ID 选择运行。下面保留
-PRCF 已创建的目录命名。Mimic 一阶段已实现，操作见 [preprocessing.md](preprocessing.md)；Parkour 和消融目录仍为设计提案。
+PRCF 已创建的目录命名。Mimic 一阶段已实现，操作见 [preprocessing.md](preprocessing.md)。Parkour 的 TIMP 基线已接入训练和回放，操作见 [TIMP 说明](../src/prcf/tasks/parkour/config/TIMP/README.md)。
 
-## 1. 整体目录
+## 1. 当前目录
 
 ```text
 PRCF/
-├── pyproject.toml
-├── uv.lock
-├── .python-version
-├── .venv/                              # uv 环境，显示名称 PRCF
-├── README.md
-│
+├── scripts/
+│   ├── train.py                 # 训练、准备环境、创建 runner
+│   ├── play.py                  # 加载 checkpoint 看策略
+│   ├── replay_motion.py         # 回放输入动作、编辑障碍物
+│   ├── export_reference.py      # 执行 checkpoint，写出单个 AMP NPZ
+│   ├── csv_to_npz_e1.py          # 重定向 CSV 转 mjlab NPZ
+│   └── list_envs.py              # 列出任务 ID
 ├── src/prcf/
-│   ├── __init__.py
-│   ├── asset/                          # 沿用现有命名
-│   │   ├── robot/
-│   │   │   └── e1/
-│   │   │       ├── e1_constants.py
-│   │   │       └── xmls/               # 现有 MJCF、场景和网格资源
-│   │   ├── motion/e1/                  # 当前 E1 动作资源
-│   │   │   ├── raw/
-│   │   │   ├── csv/
-│   │   │   └── npz/                   # NPZ + stairs/up_box/down_box.json
-│   │   └── objects/                    # 后续按需增加障碍物资源
-│   │
-│   ├── motion/                         # 跨任务复用的数据处理逻辑
-│   │   ├── schema.py
-│   │   ├── validation.py
-│   │   ├── recording.py
-│   │   ├── export.py
-│   │   └── quality.py
-│   │
+│   ├── asset/
+│   │   ├── scene.py              # 脚本共用的场景构建与输入读取、对齐
+│   │   ├── motion/e1/            # raw、csv、npz 和配套场景 JSON
+│   │   └── robot/e1/             # E1 模型和执行器配置
 │   └── tasks/
-│       ├── __init__.py                 # 加载项目任务注册
-│       ├── mimic/                      # 已建目录：物理参考动作跟踪
-│       │   ├── __init__.py
-│       │   ├── workflow.py             # Mimic 数据准备、runner 与评估导出
-│       │   ├── replay.py               # CPU 动作回放、网页场景编辑与保存
-│       │   └── config/
-│       │       ├── e1/                 # 首个 Mimic 任务配置
-│       │       │   ├── __init__.py      # 注册任务
-│       │       │   ├── env_cfgs.py      # 环境、跟踪/接触身体集合
-│       │       │   ├── rl_cfg.py        # PPO 配置
-│       │       │   └── mdp/            # 命令、终止、指标和轨迹记录
-│       │       └── e1_reference/       # 参考残差动作 + 双脚世界位置跟踪
-│       └── parkour/                    # 已建目录：统一视觉全身越障
-│           ├── __init__.py
-│           └── config/
-│               ├── e1_25dof_baseline/
-│               ├── e1_25dof_prcf/
-│               ├── e1_25dof_no_memory/
-│               ├── e1_25dof_no_reliability/
-│               └── e1_25dof_no_contact_feasibility/
-│
-├── scripts/                            # 统一命令行入口，沿用已建目录
-│   ├── train.py
-│   ├── play.py
-│   ├── evaluate.py
-│   ├── list_envs.py
-│   ├── validate_motion.py
-│   ├── export_reference.py
-│   ├── replay_motion.py
-│   ├── csv_to_npz_e1.py
-│   └── export_policy.py
-│
-├── datasets/                           # 沿用现有目录，不再另建 data/
-│   └── e1/
-│       ├── locomotion/                 # 已建动作类别目录
-│       ├── stairs/
-│       ├── up_box/
-│       ├── down_box/
-│       └── manifests/                  # 后续：动作、场景、数据划分、参考池清单
-│
-├── logs/                               # 训练、评估和导出结果，不纳入 Git
-│   └── <task_id>/<run_id>/
-│       ├── config/
-│       ├── checkpoints/
-│       ├── logs/
-│       ├── evaluation/
-│       └── videos/
-│
-├── deploy/                             # 已建目录，后续部署配置与运行入口
-├── tests/                              # 数据约定与关键逻辑验证
+│       ├── mimic/config/
+│       │   ├── e1/               # 基线环境、PPO、MDP 和任务注册
+│       │   └── e1_reference/     # 参考残差动作和脚部跟踪奖励
+│       └── parkour/config/TIMP/  # 地形索引 AMP 与几何支撑适应基线
+├── logs/
+│   ├── <task>/<run>/             # 模型、TensorBoard、训练配置
+│   └── exports/                 # 导出的 AMP NPZ
+├── tests/
 └── docs/
-    ├── project_structure.md
-    ├── motion_format.md                # 已实现的数据约定
-    ├── preprocessing.md                # 已实现的 Mimic 流程
-    └── experiments.md                  # 后续编写
 ```
 
-当前已有 E1 资产与数据类别，因此提案以 `e1_25dof` 举例；这不将项目限制为
-E1。后续如使用 G1，增加相应资产、数据和任务配置目录，明确其自由度与
-关节/身体映射，不混用机器人数据。当前命令行参数解析直接位于 `scripts/`；Mimic 的共用运行流程集中在
-`tasks/mimic/workflow.py`，项目根包下不再设置 `cli.py` 或 `mimic.py`。
+Mimic 的任务注册、环境和奖励继续放在 `src/prcf/tasks/mimic/config/`。
+`play.py` 与 `export_reference.py` 复用 `train.py` 的环境准备和 runner 创建，
+三者共用 `asset/scene.py` 加载动作和场景。数据采集和列拼接直接在
+`export_reference.py` 完成。
 
 ## 2. 单个任务变体的内部结构
+
+TIMP 基线集中在 [`parkour/config/TIMP/`](../src/prcf/tasks/parkour/config/TIMP/README.md)。
+`env_cfgs.py`、`rl_cfg.py` 和 `terrains.py` 组装实验，`mdp/` 管理环境逻辑，`rl/`
+管理 AMP 和 PPO 扩展。`reference_pools.json` 维护各 AMP 头对应的物理参考数据。
 
 以完整 PRCF 实验为例，任务相关内容集中在一个目录：
 
@@ -148,11 +92,10 @@ tasks/parkour/config/e1_25dof_prcf/
 | `mdp/` | 与环境状态、奖励、命令、接触测量和终止条件相关的逻辑 |
 | `rl/` | 网络前向计算、损失、优化、参考采样与学习过程 |
 | `scripts/` | 解析参数、选任务、启动运行、保存或读取结果 |
-| `motion/` | 输入校验、记录、导出与数据质量处理，供多个任务调用 |
+| `asset/scene.py` | 从场景 JSON 构建几何并读取、对齐动作 |
 
 例如，接触标签从仿真状态中生成的逻辑属于 `mdp/`；接触预测网络和监督损失
-属于 `rl/`。通用 NPZ 校验属于 `motion/validation.py`；AMP 参考池窗口采样
-属于任务的 `rl/motion_loader.py`，二者复用格式约定。
+属于 `rl/`。AMP 参考池窗口采样可放在后续任务的 `rl/motion_loader.py`，复用导出的字段与列顺序。
 
 算法优先继承当前安装版本 `rsl_rl` 的 `PPO`，runner 和模型优先复用 mjlab /
 RSL-RL 已有接口，仅覆盖项目需要的部分。旧项目提供组织参考，具体 API 在
@@ -160,12 +103,12 @@ RSL-RL 已有接口，仅覆盖项目需要的部分。旧项目提供组织参�
 
 ## 3. 消融与实验对照
 
-每个正式对照实验使用独立目录和任务 ID。下列名称为拟定名称，尚未注册：
+每个正式对照实验使用独立目录和任务 ID。Mimic 和 TIMP 已注册，PRCF 完整方法与消融为拟定项。
 
 | 实验目录 | 拟定任务 ID | 用途 |
 |---|---|---|
 | `mimic/config/e1` | `PRCF-Mimic-E1-25DoF` | 物理参考准备 |
-| `parkour/config/e1_25dof_baseline` | `PRCF-Parkour-E1-21DoF-Baseline` | 基础多头 AMP 系统 |
+| `parkour/config/TIMP` | `PRCF-Parkour-E1-25DoF-TIMP` | 地形索引 AMP 与几何支撑适应基线 |
 | `parkour/config/e1_25dof_prcf` | `PRCF-Parkour-E1-21DoF-Full` | 完整可靠感知与接触方法 |
 | `parkour/config/e1_25dof_no_memory` | `PRCF-Parkour-E1-21DoF-NoMemory` | 移除历史几何，保留明确的当前帧输入方案 |
 | `parkour/config/e1_25dof_no_reliability` | `PRCF-Parkour-E1-21DoF-NoReliability` | 保留记忆，移除可靠性信息及其决策作用 |
@@ -192,82 +135,13 @@ RSL-RL 已有接口，仅覆盖项目需要的部分。旧项目提供组织参�
 
 ### 对照结果保存
 
-每次运行将最终生效的环境与算法配置、任务 ID、随机种子、训练步数、数据
-清单/划分、机器人与场景版本、依赖锁定信息、代码版本和初始化 checkpoint
-写入 `logs/<task_id>/<run_id>/config/`。各对照沿用相同评估场景、指标和
-数据划分；训练预算和额外数据使用量也要记录，以便判断方法本身的作用。
+训练结果位于 `logs/<task_id>/<run_id>/`，包含模型权重、TensorBoard 和
+`config/`。导出 NPZ 位于 `logs/exports/`，也可用 `--output-file` 指定路径。
+各对照应记录运行配置、参考池划分及训练预算。
 
-## 4. scripts 的使用方式
+## 4. 动作数据与参考池
 
-`train.py` 和 `play.py` 通过任务 ID 处理 Mimic 与 Parkour，通常不再分别创建
-`train_mimic.py`、`train_parkour.py`。`evaluate.py` 负责固定场景和随机种子的
-批量评估；`play.py` 负责交互查看与录像。
-
-数据处理入口也放在 `scripts/`，调用 `prcf.motion` 中的处理函数。命令行参数与启动逻辑放在对应脚本内；Mimic 数据准备和 runner 等共用流程
-位于 `tasks/mimic/workflow.py`，通用数据校验、场景描述和导出仍在 `motion/`。策略导出使用
-`export_policy.py`，物理参考轨迹导出使用 `export_reference.py`，明确区分
-两类产物。后续形成稳定流程后，如确有需要，再增加批处理入口。
-
-项目打包配置完善后，通过安装的 `prcf` 包导入任务，不依赖其他本地项目的
-源码目录。具体命令行参数在实现时确定，本文不提供尚不能运行的命令。
-
-## 5. datasets 与物理参考流程
-
-保留已建的 `locomotion`、`stairs`、`up_box`、`down_box` 类别。每类数据后续
-可以按处理阶段细分，例如：
-
-```text
-datasets/e1/up_box/
-├── retargeted/                         # 原始重定向 NPZ，保留不覆盖
-├── rollouts/                           # 实际执行记录，包含成功与失败
-└── references/                         # 通过验收的物理参考
-```
-
-动作类别目录用于管理文件，多判别器的参考池由 `datasets/e1/manifests/` 中的
-清单组织，不要求“一个目录对应一个判别器”。例如，`stairs/` 内可以同时
-存在上台阶和下台阶动作，通过元数据分别分配。新增沟壑、撑越等数据时再
-增加对应类别。同一物理轨迹可以由多个参考池引用，文件只保存一份。
-
-清单记录输入相对路径、动作族、原始动作来源、机器人配置、采样约定、身体/
-关节映射、障碍几何与位姿、坐标对齐、起止状态和成功条件。大体积数据与
-运行产物不纳入 Git，清单及实验配置保留版本管理；实施时同步补齐忽略规则。
-
-当前预处理链路保持为：
-
-1. 接收重定向 NPZ，记录来源与校验和。
-2. 校验字段、维度、有限值、采样率、身体/关节顺序和四元数/速度约定。
-3. 对齐机器人、初始状态及障碍场景，攀箱和跨沟壑分别配置实际支撑几何。
-4. 用 Mimic 训练跟踪策略，在独立评估中检验完整动作。
-5. 使用选定 checkpoint 实际执行并记录状态、动作、接触与其他物理信息。
-6. 按通过结果、跟踪误差、接触有效性、穿透、滑移和执行约束筛选。
-7. 导出物理参考，回放复核，并保留来源与质量报告。
-
-“物理参考”表示实际执行并通过明确验收的轨迹，不等于无误差轨迹。
-运动学回放或前向运动学计算本身不构成物理跟踪验证。
-
-当前安装版 `MotionLoader` 读取 `joint_pos`、`joint_vel`、`body_pos_w`、
-`body_quat_w`、`body_lin_vel_w`、`body_ang_vel_w`；官方转换器另外写入 `fps`。
-加载器按控制步推进数组，未自动依据 `fps` 重采样，因此必须检查参考周期
-与环境控制周期一致。
-
-### 导出约定
-
-每条成功轨迹建议保存三个关联文件：
-
-- `<clip>.npz`：mjlab 标准运动字段，保持正确顺序。
-- `<clip>.extras.npz`：额外物理状态、接触与局部地形数据。
-- `<clip>.json`：格式版本、时间/坐标约定、身体与关节名称、机器人和场景
-  校验和、原始动作来源、checkpoint、随机种子及质量指标。
-
-动作、关节目标和实际执行力矩分别保存；原始接触与有效支撑标记分别定义。
-各字段明确单位、坐标系与时间戳，并区分控制周期和物理子步。接触力依据
-模拟器可读接口记录，不能通过运动学结果冒充。深度图按后续视觉实验需求
-独立采样保存，避免默认写入所有参考文件。
-
-## 6. 当前实施范围
-
-已实现 `mimic/config/e1`（E1 25 自由度）、`motion/` 数据处理，以及训练、查看、
-评估、导出和运动学回放入口。实际环境文件沿用 `env_cfgs.py` 命名。当前支持
-单动作与配套静态 box/stairs 场景、单 GPU PPO。额外记录通过
-`mdp/recorders.py` 接入，输入示例位于 `examples/mimic/`。CPU 校验与测试已具备；
-真实动作和 GPU 跟踪仍需用实际数据验证。完整方法和消融目录按进度建立。
+原始、重定向和仿真输入统一放在 `src/prcf/asset/motion/e1/`。使用
+`export_reference.py` 让 checkpoint 从第 0 帧执行并提取八项 AMP 特征。
+每次执行得到一个 NPZ，可在后续训练的参考池清单里按动作族或地形引用。
+详细操作见 [预处理说明](preprocessing.md)，字段见 [数据格式](motion_format.md)。

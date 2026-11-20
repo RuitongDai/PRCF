@@ -1,7 +1,9 @@
-"""Fixed collision scenes described in clip.json; box dimensions are full lengths."""
+"""Load scene manifests and build their MuJoCo geometry for the script entry points."""
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import json
+from pathlib import Path
 import re
 import mujoco
 import numpy as np
@@ -96,3 +98,49 @@ class SceneBuilder:
                 rgba=[0.6, 0.55, 0.4, 1], group=0,
             )
         spec.worldbody.add_light(name="prcf_light", pos=[0, 0, 5], type=mujoco.mjtLightType.mjLIGHT_DIRECTIONAL)
+
+
+@dataclass
+class MotionClip:
+    motion_file: Path
+    clip_id: str
+    scene: dict = field(default_factory=lambda: {'ground_height': 0.0, 'obstacles': []})
+    motion_to_scene: dict = field(default_factory=dict)
+    manifest_file: Path | None = None
+
+
+def load_clip(source):
+    path = Path(source).expanduser().resolve()
+    if path.suffix == '.npz':
+        return MotionClip(path, path.stem)
+    payload = json.loads(path.read_text())
+    return MotionClip(
+        (path.parent / payload['motion_file']).resolve(),
+        payload.get('clip_id', path.stem),
+        scene=payload.get('scene', {'ground_height': 0.0, 'obstacles': []}),
+        motion_to_scene=payload.get('motion_to_scene', {}),
+        manifest_file=path,
+    )
+
+
+def load_aligned_motion(clip):
+    with np.load(clip.motion_file, allow_pickle=False) as archive:
+        motion = dict(archive)
+    return align_motion(motion, clip.motion_to_scene)
+
+
+def align_motion(motion, transform):
+    if not transform:
+        return motion
+    shift = transform.get('position', [0, 0, 0])
+    quat = transform.get('quaternion_wxyz', [1, 0, 0, 0])
+    rotation = Rotation.from_quat(quat, scalar_first=True)
+    positions = motion['body_pos_w']
+    motion['body_pos_w'] = rotation.apply(positions.reshape(-1, 3)).reshape(positions.shape) + shift
+    for key in ('body_lin_vel_w', 'body_ang_vel_w'):
+        velocity = motion[key]
+        motion[key] = rotation.apply(velocity.reshape(-1, 3)).reshape(velocity.shape)
+    orientation = motion['body_quat_w']
+    bodies = Rotation.from_quat(orientation.reshape(-1, 4), scalar_first=True)
+    motion['body_quat_w'] = (rotation * bodies).as_quat(scalar_first=True).reshape(orientation.shape)
+    return motion

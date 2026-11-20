@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -12,11 +13,13 @@ from unittest.mock import MagicMock
 
 import mujoco
 import numpy as np
+from scipy.spatial.transform import Rotation, Slerp
 
-from prcf.motion.kinematics import build_kinematic_motion
-from prcf.motion.schema import load_clip
-from prcf.motion.validation import e1_model, sha256
-from prcf.tasks.mimic.replay import ReplayDocument, WebReplayEditor, discover_motions
+from prcf.asset.robot.e1.e1_constants import e1_model
+from prcf.asset.scene import SceneBuilder, load_clip
+from scripts.csv_to_npz_e1 import build_kinematic_motion
+from scripts.export_reference import write_trajectory
+from scripts.replay_motion import ReplayDocument, WebReplayEditor, discover_motions, set_native_frame
 
 
 class ReplayTests(unittest.TestCase):
@@ -33,7 +36,7 @@ class ReplayTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.npz = self.root / 'climb.npz'
         np.savez_compressed(self.npz, **self.motion)
-        self.source_hash = sha256(self.npz)
+        self.source_hash = hashlib.sha256(self.npz.read_bytes()).hexdigest()
         self.json = self.root / 'climb.json'
         self.payload = {
             'schema_version': 1, 'clip_id': 'climb', 'robot_id': 'e1_25dof',
@@ -48,7 +51,42 @@ class ReplayTests(unittest.TestCase):
         self.json.write_text(json.dumps(self.payload))
 
     def document(self):
-        return ReplayDocument(self.json, self.model)
+        return ReplayDocument(self.json)
+
+    def test_amp_export_replays_world_pose_and_embedded_scene(self):
+        path = self.root / 'amp.npz'
+        clip = load_clip(self.json)
+        root_pos = np.array([[0.8, -0.5, 0.9], [1.2, -0.3, 1.0]])
+        pose = Rotation.from_euler('ZYX', [[1.1, 0.2, -0.1], [1.5, -0.1, 0.2]])
+        root_quat = pose.as_quat(scalar_first=True)
+        root_quat[1] *= -1  # Equivalent recorded rotation with the opposite sign.
+        root_velocity = np.array([[0.3, 0.4, 0.1], [0.4, 0.6, 0.2]])
+        data = {
+            'root_pos_w': root_pos, 'root_quat_w': root_quat,
+            'root_lin_vel_w': root_velocity, 'root_ang_vel_w': root_velocity,
+            'dof_pos': self.motion['joint_pos'][:2], 'dof_vel': self.motion['joint_vel'][:2],
+            'body_pos_w': np.broadcast_to(root_pos[:, None, :], (2, 13, 3)),
+            'contact_state': np.zeros((2, 6)), 'dof_torque': np.ones((2, 25)),
+            'reference_frame': np.array([1, 2]),
+        }
+        write_trajectory(path, data, fps=50, clip=clip, joint_names=self.motion['joint_names'],
+                         body_names=self.motion['body_names'][1:14], termination='motion_finished',
+                         expected_frames=2)
+        with np.load(path, allow_pickle=False) as archive:
+            self.assertEqual(archive['amp_obs'].shape, (2, 357))
+        doc = ReplayDocument(path)
+        self.assertEqual(doc.scene, clip.scene)
+        state = mujoco.MjData(self.model)
+        set_native_frame(self.model, state, doc.motion, 1)
+        np.testing.assert_allclose(state.qpos[:3], root_pos[1])
+        np.testing.assert_allclose(state.qpos[3:7], root_quat[1])
+        np.testing.assert_allclose(state.qpos[7:], data['dof_pos'][1])
+        np.testing.assert_allclose(state.qvel[:3], root_velocity[1])
+        np.testing.assert_allclose(state.qvel[3:6], pose[1].inv().apply(root_velocity[1]))
+        set_native_frame(self.model, state, doc.motion, 0.5)
+        np.testing.assert_allclose(state.qpos[:3], root_pos.mean(axis=0))
+        midway = Rotation.from_quat(state.qpos[3:7], scalar_first=True)
+        np.testing.assert_allclose((midway.inv() * Slerp([0, 1], pose)(0.5)).magnitude(), 0., atol=1e-7)
 
     def test_save_reload_backup_and_training_geometry(self):
         doc = self.document()
@@ -58,19 +96,17 @@ class ReplayTests(unittest.TestCase):
         doc.save()
         loaded = load_clip(self.json)
         self.assertEqual(loaded.scene['obstacles'][0]['position'], [2.3, -.1, .45])
-        self.assertEqual(loaded.quality.max_environment_penetration, .015)
-        self.assertEqual(loaded.quality.contact_requirements[0].part, 'left_hand')
         self.assertEqual(loaded.motion_to_scene, self.payload['motion_to_scene'])
         payload = json.loads(self.json.read_text())
         self.assertEqual(payload['metadata']['note'], 'keep me')
+        self.assertEqual(payload['quality'], self.payload['quality'])
         self.assertNotIn('kinematic_scene_check', payload['metadata'])
         self.assertFalse(payload['metadata']['physics_tracking_validated'])
-        self.assertEqual(sha256(self.npz), self.source_hash)
+        self.assertEqual(hashlib.sha256(self.npz.read_bytes()).hexdigest(), self.source_hash)
         backups = list((self.root / '.scene_backups').glob('*.json'))
         self.assertEqual(len(backups), 1)
         self.assertEqual(backups[0].read_bytes(), original_bytes)
         # Compile the saved scene through the SAME builder used by training.
-        from prcf.motion.scene import SceneBuilder
         spec = mujoco.MjSpec()
         SceneBuilder(loaded.scene)(spec)
         model = spec.compile()
@@ -100,7 +136,7 @@ class ReplayTests(unittest.TestCase):
     def test_plain_npz_add_save_and_discovery_deduplicates(self):
         flat = self.root / 'walk.npz'
         np.savez_compressed(flat, **self.motion)
-        doc = ReplayDocument(flat, self.model)
+        doc = ReplayDocument(flat)
         name = doc.add_box()
         doc.save()
         self.assertEqual(load_clip(flat.with_suffix('.json')).scene['obstacles'][0]['id'], name)
@@ -108,7 +144,7 @@ class ReplayTests(unittest.TestCase):
         self.assertEqual(initial, self.json)
         self.assertEqual(len(paths), 2)
         self.assertTrue(all(p.suffix == '.json' for p in paths))
-        self.assertEqual(sha256(self.npz), self.source_hash)
+        self.assertEqual(hashlib.sha256(self.npz.read_bytes()).hexdigest(), self.source_hash)
 
     def test_stairs_parameters_and_rotation_validation(self):
         doc = self.document()
@@ -155,17 +191,24 @@ class ReplayTests(unittest.TestCase):
         self.assertEqual(editor.document.obstacle('box')['position'], [2.4, .2, .4])
         editor.dispatch('step', 1)
         self.assertEqual(editor.document.frame, 1)
+        roots = editor.document.motion['body_pos_w']
+        roots[2, 0, 0] = roots[1, 0, 0] + 0.1
         editor.dispatch('play')
-        editor.tick(.02)
+        editor.tick(.01)
+        self.assertEqual(editor.document.frame, 1)
+        self.assertAlmostEqual(editor.state.qpos[0], roots[1:3, 0, 0].mean())
+        editor.tick(.01)
         self.assertEqual(editor.document.frame, 2)
+        self.assertEqual(editor.frame_slider.value, 1)
         editor.loop.value = False
         editor.tick(1.)
         self.assertEqual(editor.document.frame, 4)
+        self.assertEqual(editor.frame_slider.value, 4)
         self.assertFalse(editor.playing)
         editor.dispatch('save')
         self.assertFalse(editor.document.dirty)
         self.assertEqual(load_clip(self.json).scene['obstacles'][0]['position'], [2.4, .2, .4])
-        self.assertEqual(sha256(self.npz), self.source_hash)
+        self.assertEqual(hashlib.sha256(self.npz.read_bytes()).hexdigest(), self.source_hash)
         self.assertGreater(server._websock_server.queue_message.call_count, 20)
         # Exercise the actual wire serializer, not just Python handle updates.
         import msgspec.msgpack

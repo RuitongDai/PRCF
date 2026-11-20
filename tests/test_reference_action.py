@@ -36,7 +36,7 @@ class ReferenceActionTests(unittest.TestCase):
         self.assertLess(float(feet_world_position_tracking(env)),.02)
 
     def test_checkpoint_with_different_action_task_is_rejected(self):
-        from prcf.tasks.mimic.workflow import build_runner
+        from scripts.train import build_runner
         with tempfile.TemporaryDirectory() as root:
             p=Path(root);(p/'config').mkdir()
             (p/'config/source.json').write_text(json.dumps({'provenance':{'task_id':'PRCF-Mimic-E1-25DoF'}}))
