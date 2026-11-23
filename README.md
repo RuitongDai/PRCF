@@ -16,34 +16,53 @@ TIMP 越障基线已接入训练和回放，支持地形索引 AMP 和手膝几�
 
 ## 1. 环境配置
 
-项目使用 **uv + Python 3.13 + 官方 mjlab 1.6.0**。虚拟环境位于 `.venv/`，提示名称为 `PRCF`，依赖版本由 `uv.lock` 锁定。
+项目使用 **uv、Python 3.13 和 PyPI 上的 mjlab 1.6.0**，依赖版本记录在 `uv.lock`。本机和服务器分别创建自己的 `.venv/`，传输项目时可以跳过这个目录。
+
+### 安装 uv
+
+首次配置时，如果终端找不到 `uv`，在 Linux 上执行以下命令。已有 `uv` 可以直接创建环境。[uv 官方安装文档](https://docs.astral.sh/uv/getting-started/installation/)
 
 ```bash
-cd /home/dai/PRCF
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv --version
+```
 
-# 已有虚拟环境时跳过创建。
+### 创建或重建环境
+
+先进入项目根目录。本机路径为 `/home/dai/PRCF`，服务器路径示例为 `/root/gpufree-data/PRCF`。
+
+```bash
 if [ ! -d .venv ]; then
   uv venv --python 3.13 --prompt PRCF
 fi
 uv sync --locked
 ```
 
-可以直接使用 `uv run`，也可以先激活环境：
+缺少 Python 3.13 时，uv 会自动下载。创建后，环境目录为 `.venv/`，激活时终端显示 `(PRCF)`。以后可以直接用 `uv run` 运行脚本，也可以手动激活。
 
 ```bash
 source .venv/bin/activate
 ```
 
-检查安装路径、GPU 和已注册任务：
+### 验证安装
+
+检查 Python 版本、mjlab 导入路径和已注册任务。
 
 ```bash
-uv run python -c "import mjlab; print(mjlab.__file__)"
-uv run python -c "import torch; print('Torch:', torch.__version__, 'CUDA:', torch.cuda.is_available())"
-nvidia-smi
-uv run python scripts/list_envs.py
+uv run --locked python --version
+uv run --locked python -c "import mjlab; print(mjlab.__file__)"
+uv run --locked python scripts/list_envs.py
 ```
 
-mjlab 从虚拟环境的 `site-packages` 导入；`third_party/mjlab/` 用于查阅源码，不会自动替代已安装的版本。GPU 训练使用 `--device cuda:0`。
+mjlab 的导入路径应位于 `.venv/` 的 `site-packages` 中。`third_party/mjlab/` 是可选的源码查阅目录。
+
+使用 GPU 训练前，再确认服务器能识别 NVIDIA 显卡，并检查 PyTorch 输出为 `CUDA: True`。训练命令的设备参数可用 `--device cuda:0`。
+
+```bash
+nvidia-smi
+uv run --locked python -c "import torch; print('Torch:', torch.__version__, 'CUDA:', torch.cuda.is_available())"
+```
 
 ## 2. 数据准备与场景配置
 

@@ -1,5 +1,5 @@
 {
-  "motion_dir": "logs/exports/amp",
+  "motion_dir": "src/prcf/asset/motion/e1/export_npz",
   "pools": {
     "locomotion": [
       {
