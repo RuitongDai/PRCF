@@ -18,8 +18,7 @@ uv run python scripts/train.py PRCF-Parkour-E1-25DoF-TIMP --stage 3 --device cud
 ```
 
 ```bash
-uv run python scripts/play.py PRCF-Parkour-E1-25DoF-TIMP --terrains high_box \
-  --checkpoint logs/PRCF-Parkour-E1-25DoF-TIMP/<run>/model_<iteration>.pt
+uv run python scripts/play.py PRCF-Parkour-E1-25DoF-TIMP --checkpoint logs/PRCF-Parkour-E1-25DoF-TIMP/<run>/model_<iteration>.pt
 ```
 
 `--terrains` 可选择要运行的地形，例如 `--terrains high_box long_high_box`。`--num-envs` 和 `--max-iterations` 可覆盖默认规模。`--reference-pools` 可替换清单，训练目录中的 `config/reference_pools.json` 保存本次配置，`source.json` 记录阶段、地形和启用的判别头。`--dry-run` 检查参考数据并编译场景。回放使用正常起点，关闭参考状态初始化。
