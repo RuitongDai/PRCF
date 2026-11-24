@@ -2,6 +2,8 @@
 
 import torch
 
+from .box_traversal import box_traversal
+
 
 def terrain_tracking_progress(
   env,
@@ -42,6 +44,10 @@ def terrain_tracking_progress(
   time_out = env.termination_manager.get_term("time_out")[env_ids]
 
   route_ok = progress >= complex_progress_fraction
+  box = box_traversal(env)
+  if box is not None:
+    on_box = box.on_box[env_ids]
+    route_ok = torch.where(on_box, box.passed[env_ids], route_ok)
   if require_target_reached:
     if "target_reached" not in env.termination_manager.active_terms:
       raise RuntimeError(
@@ -85,7 +91,7 @@ def terrain_tracking_progress(
   move_down = complex_down | perlin_down
   terrain.update_env_origins(env_ids, move_up, move_down)
 
-  return {
+  stats = {
     "mean_level": terrain.terrain_levels.float().mean(),
     "max_level": terrain.terrain_levels.float().max(),
     "move_up_fraction": move_up.float().mean(),
@@ -107,6 +113,14 @@ def terrain_tracking_progress(
     "complex_progress_ok": (route_ok & complex_mask).float().mean(),
     "target_success": target_success.float().mean(),
   }
+  if box is not None:
+    box_episodes = on_box & valid & ~standing
+    count = box_episodes.sum()
+    if count > 0:
+      stats["box_episodes"] = count
+      stats["box_mounted_rate"] = (box_episodes & box.mounted[env_ids]).sum() / count
+      stats["box_passed_rate"] = (box_episodes & box.passed[env_ids]).sum() / count
+  return stats
 
 
 __all__ = ["terrain_tracking_progress"]

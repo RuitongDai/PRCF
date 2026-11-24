@@ -31,11 +31,12 @@ from mjlab.viewer import ViewerConfig
 from prcf.asset.robot.e1.e1_constants import E1_ACTION_SCALE, get_e1_robot_cfg, get_spec
 from mjlab.managers.metrics_manager import MetricsTermCfg
 from .mdp import amp
+from .mdp.box_traversal import BoxTraversal, box_exit_bonus, box_lift_progress, box_mount_bonus
 from . import mdp
 from .constants import MJLAB_JOINT_NAMES
 from .mdp import Stage2TargetVelocityCommandCfg, LegacyGridPatternCfg
 from .sensors import PeriodicCameraSensorCfg
-from .terrains import e1_amp_parkour_terrain_cfg
+from .terrains import SingleBoxTerrainCfg, e1_amp_parkour_terrain_cfg
 
 
 def baseline_robot_cfg():
@@ -148,6 +149,8 @@ def _vdwl_hold_scan(name: str, body: str, play: bool) -> RayCastSensorCfg:
 def baseline_env_cfg(
   play: bool = False, names=None, seed=42,
 ) -> ManagerBasedRlEnvCfg:
+  terrain_generator = e1_amp_parkour_terrain_cfg(names)
+  has_box = any(isinstance(tile, SingleBoxTerrainCfg) for tile in terrain_generator.sub_terrains.values())
   all_joints = SceneEntityCfg(
     "robot", joint_names=MJLAB_JOINT_NAMES, preserve_order=True
   )
@@ -551,6 +554,13 @@ def baseline_env_cfg(
     rewards[name] = RewardTermCfg(func=mdp.LocomotionReward, weight=term.weight,
                                  params={"reward_fn": term.func, **term.params})
 
+  if has_box:
+    rewards.update(
+      box_lift_progress=RewardTermCfg(func=box_lift_progress, weight=3.0),
+      box_mount_bonus=RewardTermCfg(func=box_mount_bonus, weight=20.0),
+      box_exit_bonus=RewardTermCfg(func=box_exit_bonus, weight=30.0),
+    )
+
   sensors = (
     PeriodicCameraSensorCfg(
       name="depth_camera",
@@ -610,18 +620,31 @@ def baseline_env_cfg(
       history_length=4,
     ),
   )
+  if has_box:
+    sensors += (ContactSensorCfg(
+      name="box_foot_contacts",
+      primary=ContactMatch(
+        mode="subtree",
+        pattern=r"^(left_ankle_roll_link|right_ankle_roll_link)$",
+        entity="robot",
+      ),
+      secondary=ContactMatch(mode="body", pattern="terrain"),
+      fields=("found", "force", "pos", "normal"),
+      reduce="maxforce",
+      num_slots=4,
+    ),)
   return ManagerBasedRlEnvCfg(
     seed=seed,
     scene=SceneCfg(
       terrain=TerrainEntityCfg(
         terrain_type="generator",
-        terrain_generator=e1_amp_parkour_terrain_cfg(names),
+        terrain_generator=terrain_generator,
         max_init_terrain_level=0 if play else 5,
         debug_vis=play,
       ),
       entities={"robot": baseline_robot_cfg()},
       sensors=sensors,
-      num_envs=len(e1_amp_parkour_terrain_cfg(names).sub_terrains) if play else 4096,
+      num_envs=len(terrain_generator.sub_terrains) if play else 4096,
       extent=2.0,
     ),
     observations=observations,
@@ -652,7 +675,18 @@ def baseline_env_cfg(
         params={"asset_cfg": all_joints},
       ),
       "nan": TerminationTermCfg(func=mdp.nan_detection),
-
+      **({
+        "box_bypass": TerminationTermCfg(
+          func=BoxTraversal,
+          params={
+            "command_name": "base_velocity",
+            "sensor_name": "box_foot_contacts",
+            "contact_force_threshold": 15.0,
+            "mount_seconds": 0.10,
+            "landing_seconds": 0.30,
+            "bypass_seconds": 0.10,
+          },
+        )} if has_box else {}),
       **({
         "target_reached": TerminationTermCfg(
           func=mdp.target_reached,

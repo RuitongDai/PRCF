@@ -6,11 +6,13 @@ from unittest.mock import patch
 import torch
 
 from prcf.tasks.parkour.config.baseline.mdp.amp import AMP_DIM
+from prcf.tasks.parkour.config.baseline.mdp.box_traversal import BoxTraversal
 from prcf.tasks.parkour.config.baseline.mdp.observations import DepthHistory
 from prcf.tasks.parkour.config.baseline.mdp.stage2_commands import Stage2TargetVelocityCommand
 from prcf.tasks.parkour.config.baseline.mdp.terminations import invalid_body_contacts
 from prcf.tasks.parkour.config.baseline.rl.algorithm import BaselinePPO, WindowReplay
 from prcf.tasks.parkour.config.baseline.rl.motion_loader import WINDOW
+from prcf.tasks.parkour.config.baseline.terrains import SingleBoxTerrainCfg
 
 
 class BaselineTests(unittest.TestCase):
@@ -60,6 +62,85 @@ class BaselineTests(unittest.TestCase):
         env = SimpleNamespace(scene=Scene(), device='cpu')
         self.assertEqual(invalid_body_contacts(env, 'undesired_contact').tolist(),
                          [[True, True, True], [True, False, False]])
+
+    def test_box_traversal_requires_consecutive_top_support_and_stable_exit(self):
+        tile = SingleBoxTerrainCfg(box_length=2.4)
+        generator = SimpleNamespace(sub_terrains={'long_high_box': tile, 'perlin_rough': None},
+                                    difficulty_range=(0.0, 1.0), num_rows=2)
+        origin = torch.tensor([[2.0, 3.0, 0.0], [4.0, 5.0, 0.0], [6.0, 7.0, 0.0]])
+        robot = SimpleNamespace(
+            root_link_pos_w=origin + torch.tensor([[tile.front_x + .05, 0., .75],
+                                                  [tile.front_x + .05, .85, .75],
+                                                  [tile.front_x + .05, 0., .75]]),
+            projected_gravity_b=torch.tensor([[0., 0., -1.]]).repeat(3, 1),
+            root_link_lin_vel_w=torch.zeros(3, 3),
+        )
+        position = origin[:, None, :] + torch.tensor([tile.front_x + .1, 0., 1.0])
+        contacts = SimpleNamespace(pos=position.repeat(1, 8, 1), found=torch.ones(3, 8),
+                                   force=torch.tensor([8., 0., 0.]).repeat(3, 8, 1),
+                                   normal=torch.tensor([1., 0., 0.]).repeat(3, 8, 1))
+
+        class Scene(dict):
+            terrain = SimpleNamespace(terrain_types=torch.tensor([0, 0, 1]),
+                                      terrain_levels=torch.tensor([1, 1, 0]),
+                                      cfg=SimpleNamespace(terrain_generator=generator))
+            env_origins = origin
+
+        command = SimpleNamespace(is_standing_env=torch.zeros(3, dtype=torch.bool))
+        env = SimpleNamespace(device='cpu', num_envs=3, step_dt=.02,
+                              scene=Scene(robot=SimpleNamespace(data=robot), feet=SimpleNamespace(data=contacts)),
+                              command_manager=SimpleNamespace(get_term=lambda name: command))
+        route = BoxTraversal(None, env)
+
+        def step():
+            return route(env, command_name='base_velocity', sensor_name='feet',
+                         contact_force_threshold=15., mount_seconds=.10,
+                         landing_seconds=.30, bypass_seconds=.10)
+
+        # A vertical face cannot count as top support. Leaving the corridor
+        # for five steps is a failure only in the box environment.
+        for _ in range(4):
+            self.assertFalse(step().any())
+        robot.root_link_pos_w[:, 2] += .008
+        self.assertEqual(step().tolist(), [False, True, False])
+        self.assertFalse(route.mounted.any())
+        torch.testing.assert_close(route.lift, torch.tensor([1., 0., 0.]))
+
+        contacts.normal[:] = torch.tensor([0., 0., 1.])
+        contacts.found[0, 4:] = 0
+        for _ in range(4):
+            step()
+            self.assertFalse(route.mounted.any())
+        # Changing which foot touches restarts the dwell for the new foot.
+        contacts.found[0, :4] = 0
+        contacts.found[0, 4:] = 1
+        for _ in range(4):
+            step()
+            self.assertFalse(route.mounted.any())
+        step()
+        self.assertEqual(route.mount_bonus.tolist(), [True, False, False])
+        step()
+        self.assertFalse(route.mount_bonus.any())
+
+        robot.root_link_pos_w[0, 0] = origin[0, 0] + tile.end_x + .2
+        contacts.pos[0, :, 0] = robot.root_link_pos_w[0, 0]
+        contacts.pos[0, :, 2] = 0.
+        robot.root_link_lin_vel_w[0, 2] = -.6
+        step()
+        self.assertFalse(route.passed.any())
+        robot.root_link_lin_vel_w[0, 2] = 0.
+        for _ in range(14):
+            step()
+            self.assertFalse(route.passed.any())
+        step()
+        self.assertEqual(route.exit_bonus.tolist(), [True, False, False])
+        step()
+        self.assertFalse(route.exit_bonus.any())
+        route.reset(torch.tensor([1]))
+        self.assertEqual(route.passed.tolist(), [True, False, False])
+        route.reset(torch.tensor([0]))
+        self.assertFalse(route.mounted.any())
+        self.assertFalse(route.passed.any())
 
     def test_camera_history_waits_for_real_capture_and_refills_after_reset(self):
         sensor = SimpleNamespace(

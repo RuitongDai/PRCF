@@ -227,13 +227,13 @@ def feet_roll_downstairs(
   if generator is None:
     return torch.zeros(env.num_envs, device=env.device)
   all_terrain_names = tuple(generator.sub_terrains)
-  missing = [name for name in terrain_names if name not in all_terrain_names]
-  if missing:
-    raise ValueError(f"Unknown downhill terrain names: {missing}")
+  downhill_ids = [all_terrain_names.index(name) for name in terrain_names if name in all_terrain_names]
+  if not downhill_ids:
+    return torch.zeros(env.num_envs, device=env.device)
   terrain_types = env.scene.terrain.terrain_types
   downhill = torch.zeros_like(terrain_types, dtype=torch.bool)
-  for name in terrain_names:
-    downhill |= terrain_types == all_terrain_names.index(name)
+  for terrain_id in downhill_ids:
+    downhill |= terrain_types == terrain_id
 
   command_x = env.command_manager.get_command(command_name)[:, 0]
   active = downhill & (command_x.abs() > float(command_x_threshold))
@@ -283,12 +283,12 @@ def feet_both_air_downstairs(
     return torch.zeros(env.num_envs, device=env.device)
   terrain_types = env.scene.terrain.terrain_types
   terrain_names_all = tuple(generator.sub_terrains)
-  missing = [name for name in terrain_names if name not in terrain_names_all]
-  if missing:
-    raise ValueError(f"Unknown downhill terrain names: {missing}")
+  downhill_ids = [terrain_names_all.index(name) for name in terrain_names if name in terrain_names_all]
+  if not downhill_ids:
+    return torch.zeros(env.num_envs, device=env.device)
   descending = torch.zeros_like(terrain_types, dtype=torch.bool)
-  for name in terrain_names:
-    descending |= terrain_types == terrain_names_all.index(name)
+  for terrain_id in downhill_ids:
+    descending |= terrain_types == terrain_id
 
   sensor: ContactSensor = env.scene[sensor_name]
   assert sensor.data.force is not None

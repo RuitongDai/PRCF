@@ -6,6 +6,7 @@ from mjlab.entity import Entity
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import ContactSensor
 from ..terrains import HEADS, amp_head
+from .box_traversal import box_traversal
 
 
 def invalid_body_contacts(env, sensor_name: str, threshold: float = 1.0) -> torch.Tensor:
@@ -143,6 +144,9 @@ def target_reached(
     & upright
     & vertical_stable
   )
+  box = box_traversal(env)
+  if box is not None:
+    reached = torch.where(box.on_box, box.passed, reached)
   return reached & ~term.is_standing_env & (env.episode_length_buf > 1)
 
 
