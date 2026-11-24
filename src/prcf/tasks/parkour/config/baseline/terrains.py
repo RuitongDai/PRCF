@@ -18,8 +18,8 @@ from mjlab.terrains.terrain_generator import SubTerrainCfg, TerrainGeometry, Ter
 HEADS = ("locomotion", "stairs", "box")
 TERRAIN_HEADS = {
     "perlin_rough": "locomotion",
-    "square_gaps": "locomotion",
-    "stairs_up": "locomotion",
+    "square_gaps": "stairs",
+    "stairs_up": "stairs",
     "stairs_up_high": "stairs",
     "stairs_down": "stairs",
     "stairs_down_high": "stairs",
