@@ -25,7 +25,7 @@ def baseline_rl_cfg(*, play=False, names=TERRAINS, manifest=str(DEFAULT_POOLS), 
              'batch_size': 256, 'replay_capacity': 100_000},
     )
     return RslRlOnPolicyRunnerCfg(
-        seed=seed, num_steps_per_env=24, max_iterations=50_000, save_interval=100,
+        seed=seed, num_steps_per_env=24, max_iterations=50_000, save_interval=500,
         experiment_name='baseline', logger='tensorboard', upload_model=False, clip_actions=None,
         obs_groups={'actor': ('actor', 'depth'), 'critic': ('critic', 'critic_height_scan')},
         actor=RslRlModelCfg(class_name=f'{VDWLMLPActorModel.__module__}:VDWLMLPActorModel',

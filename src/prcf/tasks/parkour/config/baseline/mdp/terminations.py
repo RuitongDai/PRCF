@@ -38,6 +38,27 @@ def traversal_orientation(env, limit_angle):
   return angle > maximum
 
 
+def time_out_with_rough_boundary(
+  env,
+  command_name: str = "base_velocity",
+  rough_episode_s: float = 20.0,
+  edge_margin: float = 0.35,
+) -> torch.Tensor:
+  """Truncate rough episodes before crossing their assigned tile boundary."""
+  regular_timeout = env.episode_length_buf >= env.max_episode_length
+  command = env.command_manager.get_term(command_name)
+  local_xy = (
+    command.robot.data.root_link_pos_w[:, :2] - env.scene.env_origins[:, :2]
+  )
+  patch_x, patch_y = env.cfg.scene.terrain.terrain_generator.size
+  near_edge = (
+    (local_xy[:, 0].abs() >= patch_x / 2 - edge_margin)
+    | (local_xy[:, 1].abs() >= patch_y / 2 - edge_margin)
+  )
+  rough_timeout = env.episode_length_buf >= round(rough_episode_s / env.step_dt)
+  return regular_timeout | (command.rough_terrain & (near_edge | rough_timeout))
+
+
 def terrain_out_of_bounds(
   env,
   distance_buffer: float = 2.0,
@@ -152,6 +173,7 @@ def target_reached(
 
 __all__ = [
   "illegal_contact", "traversal_orientation",
+  "time_out_with_rough_boundary",
   "terrain_out_of_bounds",
   "gap_base_height",
   "target_reached",

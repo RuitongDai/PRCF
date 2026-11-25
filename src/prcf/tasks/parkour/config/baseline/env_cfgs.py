@@ -35,6 +35,7 @@ from .mdp.box_traversal import BoxTraversal, box_exit_bonus, box_lift_progress, 
 from . import mdp
 from .constants import MJLAB_JOINT_NAMES
 from .mdp import Stage2TargetVelocityCommandCfg, LegacyGridPatternCfg
+from .mdp.terminations import time_out_with_rough_boundary
 from .sensors import PeriodicCameraSensorCfg
 from .terrains import SingleBoxTerrainCfg, e1_amp_parkour_terrain_cfg
 
@@ -654,7 +655,15 @@ def baseline_env_cfg(
     events=events,
     rewards=rewards,
     terminations={
-      "time_out": TerminationTermCfg(func=mdp.time_out, time_out=True),
+      "time_out": TerminationTermCfg(
+        func=time_out_with_rough_boundary,
+        time_out=True,
+        params={
+          "command_name": "base_velocity",
+          "rough_episode_s": 20.0,
+          "edge_margin": 0.35,
+        },
+      ),
       "illegal_contact": TerminationTermCfg(
         func=mdp.illegal_contact,
         params={"sensor_name": "undesired_contact", "threshold": 1.0},

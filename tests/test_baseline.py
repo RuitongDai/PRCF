@@ -9,13 +9,38 @@ from prcf.tasks.parkour.config.baseline.mdp.amp import AMP_DIM
 from prcf.tasks.parkour.config.baseline.mdp.box_traversal import BoxTraversal
 from prcf.tasks.parkour.config.baseline.mdp.observations import DepthHistory
 from prcf.tasks.parkour.config.baseline.mdp.stage2_commands import Stage2TargetVelocityCommand
-from prcf.tasks.parkour.config.baseline.mdp.terminations import invalid_body_contacts
+from prcf.tasks.parkour.config.baseline.mdp.terminations import (
+    invalid_body_contacts, time_out_with_rough_boundary,
+)
 from prcf.tasks.parkour.config.baseline.rl.algorithm import BaselinePPO, WindowReplay
 from prcf.tasks.parkour.config.baseline.rl.motion_loader import WINDOW
 from prcf.tasks.parkour.config.baseline.terrains import SingleBoxTerrainCfg
 
 
 class BaselineTests(unittest.TestCase):
+    def test_rough_timeout_uses_local_tile_and_preserves_other_timeouts(self):
+        origins = torch.tensor([[20., -28., 0.]]).repeat(6, 1)
+        offsets = torch.tensor([
+            [3.64, -3.64, 0.], [3.66, 0., 0.], [0., -3.66, 0.],
+            [0., 0., 0.], [3.66, 0., 0.], [0., 0., 0.],
+        ])
+        command = SimpleNamespace(
+            robot=SimpleNamespace(data=SimpleNamespace(root_link_pos_w=origins + offsets)),
+            rough_terrain=torch.tensor([True, True, True, True, False, False]),
+        )
+        env = SimpleNamespace(
+            scene=SimpleNamespace(env_origins=origins),
+            cfg=SimpleNamespace(scene=SimpleNamespace(terrain=SimpleNamespace(
+                terrain_generator=SimpleNamespace(size=(8., 8.)),
+            ))),
+            command_manager=SimpleNamespace(get_term=lambda name: command),
+            episode_length_buf=torch.tensor([999, 999, 999, 1000, 1000, 2000]),
+            max_episode_length=2000,
+            step_dt=.02,
+        )
+        self.assertEqual(time_out_with_rough_boundary(env).tolist(),
+                         [False, True, True, True, False, True])
+
     def test_zero_stop_handles_vector_dt_and_partial_reset(self):
         command = object.__new__(Stage2TargetVelocityCommand)
         count = 4096
