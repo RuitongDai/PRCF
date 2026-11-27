@@ -77,9 +77,9 @@ class GroundContactCfg(ContactSensorCfg):
 
 class GroundContact(ContactSensor):
     def _update_air_time_tracking(self, dt):
-        # MuJoCo's netforce reduction reports world-frame force. The source
-        # GroundSensorZ counts only upward support above 1 N as ground contact.
-        supported = self._extract_sensor_data().force[..., 2] > 1.0
+        # The net wrench follows the primary (robot) toward the secondary
+        # (terrain). The upward reaction on the robot is the opposite force.
+        supported = -self._extract_sensor_data().force[..., 2] > 1.0
         state = self._air_time_state
         landed = supported & (state.current_air_time > 0.0)
         detached = ~supported & (state.current_contact_time > 0.0)
