@@ -7,9 +7,15 @@ from tempfile import TemporaryDirectory
 import time
 
 if __package__:
-    from .train import TIMP_TASK_ID, TERRAINS, build_runner, dry_run, prepare_env, prepare_timp
+    from .train import (
+        APEX_TASK_IDS, BOX_TASK_ID, TIMP_AVAILABLE, TIMP_TASK_ID, TERRAINS,
+        build_runner, dry_run, prepare_apex, prepare_box, prepare_env, prepare_timp,
+    )
 else:
-    from train import TIMP_TASK_ID, TERRAINS, build_runner, dry_run, prepare_env, prepare_timp
+    from train import (
+        APEX_TASK_IDS, BOX_TASK_ID, TIMP_AVAILABLE, TIMP_TASK_ID, TERRAINS,
+        build_runner, dry_run, prepare_apex, prepare_box, prepare_env, prepare_timp,
+    )
 
 
 def preview_terrain(cfg, viewer):
@@ -45,7 +51,7 @@ def preview_terrain(cfg, viewer):
     # Fail promptly if the port is unavailable.
     with socket.socket() as probe:
         probe.bind(('127.0.0.1', 8080))
-    server = viser.ViserServer(host='127.0.0.1', port=8080, label='PRCF TIMP Terrain')
+    server = viser.ViserServer(host='127.0.0.1', port=8080, label='PRCF Terrain')
     try:
         server.scene.set_up_direction('+z')
         view = ViserMujocoScene(server, model, num_envs=1)
@@ -76,20 +82,33 @@ def main(argv=None):
                         help='E1 NPZ for flat ground, or motion/scene JSON')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--checkpoint', help='local .pt checkpoint')
-    mode.add_argument('--preview-terrain', action='store_true', help='view the static TIMP training terrain on CPU')
+    mode.add_argument('--preview-terrain', action='store_true', help='view the static parkour terrain on CPU')
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--seed', type=int, default=42, help='simulation reset seed')
+    parser.add_argument('--num-envs', type=int, help='number of APEX playback environments')
     parser.add_argument('--log-root', '--output-root', help='compatibility option; play does not create log directories')
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--viewer', choices=('native', 'viser'), default='native')
     parser.add_argument('--terrains', nargs='+', help='select TIMP terrain columns by name')
     parser.add_argument('--terrain-layout', choices=('training', 'copied'), help=argparse.SUPPRESS)
+    parser.add_argument('--box-velocity-only', action='store_true', help='show only the forward speed reward for BoxObstacles')
     args = parser.parse_args(argv)
+    apex = args.task in APEX_TASK_IDS
+    if args.task == TIMP_TASK_ID and not TIMP_AVAILABLE:
+        parser.error('TIMP is unavailable in this checkout')
+    if args.num_envs is not None and (not apex or args.num_envs < 1):
+        parser.error('--num-envs requires an APEX task and a positive value')
     if not (args.dry_run or args.preview_terrain or args.checkpoint):
         parser.error('--checkpoint is required')
     if args.task == TIMP_TASK_ID and args.motion_file:
         parser.error('Use --terrains to select a TIMP play scene')
-    if args.task != TIMP_TASK_ID and not args.motion_file:
+    if args.task == BOX_TASK_ID and args.motion_file:
+        parser.error('BoxObstacles uses its configured ascent and descent tiles')
+    if apex and args.motion_file:
+        parser.error('APEX uses the terrain and poses configured by its task ID')
+    if args.box_velocity_only and args.task != BOX_TASK_ID:
+        parser.error('--box-velocity-only applies to BoxObstacles')
+    if not apex and args.task not in (TIMP_TASK_ID, BOX_TASK_ID) and not args.motion_file:
         parser.error('--motion-file/--clip is required for Mimic')
     if args.task != TIMP_TASK_ID and args.terrains:
         parser.error('--terrains applies to TIMP')
@@ -99,9 +118,14 @@ def main(argv=None):
                          or any(name not in TERRAINS for name in args.terrains)):
         parser.error(f'--terrains requires unique names from {", ".join(TERRAINS)}')
     if args.preview_terrain:
-        if args.task != TIMP_TASK_ID:
-            parser.error('--preview-terrain applies to TIMP')
-        cfg, _ = prepare_timp(play=True, terrains=args.terrains, num_envs=1, seed=args.seed)
+        if args.task == TIMP_TASK_ID:
+            cfg, _ = prepare_timp(play=True, terrains=args.terrains, num_envs=1, seed=args.seed)
+        elif args.task == BOX_TASK_ID:
+            cfg, _ = prepare_box(play=True, seed=args.seed)
+        elif apex:
+            cfg, _ = prepare_apex(args.task, play=True, num_envs=1, seed=args.seed)
+        else:
+            parser.error('--preview-terrain applies to APEX, TIMP and BoxObstacles')
         cfg.scene.entities = {}
         cfg.scene.sensors = ()
         generator = cfg.scene.terrain.terrain_generator
@@ -120,6 +144,10 @@ def main(argv=None):
     with TemporaryDirectory(prefix='prcf-play-') as directory:
         if args.task == TIMP_TASK_ID:
             cfg, agent = prepare_timp(play=True, terrains=args.terrains, seed=args.seed)
+        elif args.task == BOX_TASK_ID:
+            cfg, agent = prepare_box(play=True, seed=args.seed, progress=not args.box_velocity_only)
+        elif apex:
+            cfg, agent = prepare_apex(args.task, play=True, num_envs=args.num_envs, seed=args.seed)
         else:
             cfg, agent, *_ = prepare_env(
                 args.task, args.motion_file, Path(directory) / 'reference.npz', play=True, seed=args.seed,

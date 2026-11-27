@@ -1,4 +1,5 @@
 """Check that AMP windows never bridge an episode reset or a routing change."""
+from importlib.util import find_spec
 from types import SimpleNamespace
 import math
 import unittest
@@ -7,6 +8,9 @@ from unittest.mock import patch
 import torch
 from mjlab.sensor import ObjRef
 from mjlab.utils.lab_api.math import matrix_from_quat, quat_from_euler_xyz, yaw_quat
+
+if find_spec("prcf.tasks.parkour.config.TIMP") is None:
+    raise unittest.SkipTest("TIMP is unavailable in this checkout")
 
 from prcf.tasks.parkour.config.TIMP.mdp.observations import AMP_DIM, AmpRayCastCfg
 from prcf.tasks.parkour.config.TIMP.rl.algorithm import TimpPPO, WindowReplay

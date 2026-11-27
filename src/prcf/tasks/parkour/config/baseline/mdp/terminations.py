@@ -134,6 +134,15 @@ def unstable_velocity(
   )
 
 
+def failure_termination(env) -> torch.Tensor:
+  """Penalize failures while allowing a box task to terminate on success."""
+  manager = env.termination_manager
+  failed = manager.terminated
+  if "box_success" in manager.active_terms:
+    failed = failed & ~manager.get_term("box_success")
+  return failed.float()
+
+
 def target_reached(
   env,
   command_name: str = "base_velocity",
@@ -167,7 +176,7 @@ def target_reached(
   )
   box = box_traversal(env)
   if box is not None:
-    reached = torch.where(box.on_box, box.passed, reached)
+    reached &= ~box.on_box
   return reached & ~term.is_standing_env & (env.episode_length_buf > 1)
 
 
@@ -176,6 +185,7 @@ __all__ = [
   "time_out_with_rough_boundary",
   "terrain_out_of_bounds",
   "gap_base_height",
+  "failure_termination",
   "target_reached",
   "unstable_velocity",
 ]

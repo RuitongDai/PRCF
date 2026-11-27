@@ -1,1 +1,0 @@
-"""TIMP environment terms."""

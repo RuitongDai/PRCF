@@ -6,7 +6,7 @@
 
 当前已完成 E1 25 自由度机器人的数据处理流程：重定向 CSV 转换、动作与场景配对、Mimic 跟踪训练、策略回放，以及 AMP 参考特征导出。
 
-TIMP 越障基线已接入训练和回放，支持地形索引 AMP 和手膝几何支撑适应。见 [TIMP 训练说明](src/prcf/tasks/parkour/config/TIMP/README.md)。
+APEX 上箱与下箱技能已迁移到 E1 25DoF 和 mjlab。见 [APEX 训练与回放说明](src/prcf/tasks/parkour/config/apex/README.md)。
 
 ```text
 重定向 CSV → mjlab NPZ → 配套场景 JSON → Mimic 训练 → 策略执行 → 导出 AMP NPZ

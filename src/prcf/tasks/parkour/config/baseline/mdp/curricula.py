@@ -44,20 +44,31 @@ def terrain_tracking_progress(
   time_out = env.termination_manager.get_term("time_out")[env_ids]
 
   route_ok = progress >= complex_progress_fraction
+  nav_mask = complex_mask
+  box_up = torch.zeros_like(valid)
+  box_down = torch.zeros_like(valid)
   box = box_traversal(env)
   if box is not None:
     on_box = box.on_box[env_ids]
-    route_ok = torch.where(on_box, box.passed[env_ids], route_ok)
+    box_success = env.termination_manager.get_term("box_success")[env_ids]
+    # Box tasks end as soon as the contact goal is met, so full-episode
+    # velocity tracking averages would penalize early successes.
+    box_up = on_box & valid & box_success
+    box_down = on_box & valid & ~box_success
+    nav_mask = complex_mask & ~on_box
+    route_ok = torch.where(on_box, box_success, route_ok)
   if require_target_reached:
     if "target_reached" not in env.termination_manager.active_terms:
       raise RuntimeError(
         "require_target_reached=True requires a target_reached termination term."
       )
     target_success = env.termination_manager.get_term("target_reached")[env_ids]
+    if box is not None:
+      target_success = target_success | box_success
   else:
     target_success = torch.ones_like(route_ok)
   complex_up = (
-    complex_mask
+    nav_mask
     & (linear > linear_thresholds[1])
     & (yaw > yaw_thresholds[1])
     & ~standing
@@ -73,9 +84,9 @@ def terrain_tracking_progress(
     & (moving_linear >= perlin_min_linear_tracking)
     & (moving_yaw >= perlin_min_yaw_tracking)
   )
-  move_up = complex_up | perlin_up
+  move_up = complex_up | perlin_up | box_up
   complex_down = (
-    complex_mask
+    nav_mask
     & (
       (linear < linear_thresholds[0])
       | (yaw < yaw_thresholds[0])
@@ -88,7 +99,7 @@ def terrain_tracking_progress(
   # Match the hybrid task on Perlin: a reset that does not satisfy the full
   # timeout/travel/tracking gate moves down. Navigation keeps its neutral band.
   perlin_down = perlin_mask & valid & ~perlin_up
-  move_down = complex_down | perlin_down
+  move_down = complex_down | perlin_down | box_down
   terrain.update_env_origins(env_ids, move_up, move_down)
 
   stats = {
@@ -114,12 +125,12 @@ def terrain_tracking_progress(
     "target_success": target_success.float().mean(),
   }
   if box is not None:
-    box_episodes = on_box & valid & ~standing
-    count = box_episodes.sum()
-    if count > 0:
-      stats["box_episodes"] = count
-      stats["box_mounted_rate"] = (box_episodes & box.mounted[env_ids]).sum() / count
-      stats["box_passed_rate"] = (box_episodes & box.passed[env_ids]).sum() / count
+    for task, mask in (("up", box.course.up), ("down", box.course.down)):
+      episodes = mask[env_ids] & valid
+      count = episodes.sum()
+      if count > 0:
+        stats[f"box_{task}_episodes"] = count
+        stats[f"box_{task}_success_rate"] = (episodes & box_success).sum() / count
   return stats
 
 

@@ -31,11 +31,13 @@ from mjlab.viewer import ViewerConfig
 from prcf.asset.robot.e1.e1_constants import E1_ACTION_SCALE, get_e1_robot_cfg, get_spec
 from mjlab.managers.metrics_manager import MetricsTermCfg
 from .mdp import amp
-from .mdp.box_traversal import BoxTraversal, box_exit_bonus, box_lift_progress, box_mount_bonus
+from .mdp.box_traversal import (
+  BoxTraversal, box_exit_bonus, box_lift_progress, box_mount_bonus, box_task_succeeded, reset_box_pose,
+)
 from . import mdp
 from .constants import MJLAB_JOINT_NAMES
 from .mdp import Stage2TargetVelocityCommandCfg, LegacyGridPatternCfg
-from .mdp.terminations import time_out_with_rough_boundary
+from .mdp.terminations import failure_termination, time_out_with_rough_boundary
 from .sensors import PeriodicCameraSensorCfg
 from .terrains import SingleBoxTerrainCfg, e1_amp_parkour_terrain_cfg
 
@@ -352,6 +354,8 @@ def baseline_env_cfg(
       },
     ),
   }
+  if has_box:
+    events["reset_box_pose"] = EventTermCfg(func=reset_box_pose, mode="reset")
   if not play:
     events.update({
       "push_robot": EventTermCfg(
@@ -507,7 +511,7 @@ def baseline_env_cfg(
       weight=-1.0,
       params={"sensor_name": "undesired_contact", "threshold": 1.0},
     ),
-    "termination": RewardTermCfg(func=mdp.is_terminated, weight=-200.0),
+    "termination": RewardTermCfg(func=failure_termination, weight=-200.0),
   }
 
   rewards["feet_gait_contact"] = RewardTermCfg(
@@ -695,7 +699,9 @@ def baseline_env_cfg(
             "landing_seconds": 0.30,
             "bypass_seconds": 0.10,
           },
-        )} if has_box else {}),
+        ),
+        "box_success": TerminationTermCfg(func=box_task_succeeded),
+      } if has_box else {}),
       **({
         "target_reached": TerminationTermCfg(
           func=mdp.target_reached,
